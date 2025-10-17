@@ -7,6 +7,8 @@ import smtplib
 from dotenv import load_dotenv
 from fastapi import FastAPI, Form, Path
 from pathlib import Path as FilePath
+from models import Player
+from database import SessionLocal
 
 
 app = FastAPI()
@@ -18,11 +20,9 @@ SMTP_PORT = int(os.getenv("SMTP_PORT"))
 SENDER_EMAIL = os.getenv("SENDER_EMAIL")
 SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
 
-# Guardamos jugadores temporalmente
 players = {}
 
 
-# Cargamos nuestro html
 def load_template(player: str, role: str) -> str:
     template_path = FilePath("email_template.html")
     html = template_path.read_text(encoding="utf-8")
@@ -46,10 +46,20 @@ def user_list():
 
 @app.post("/start_game")
 def start_game():
-    words = ["Messi", "Cristiano", "Benzema", "Neymar"]
-    secret_word = random.choice(words)
+    db = SessionLocal()
+    all_players = db.query(Player).all()
+    db.close()
+
+    if not all_players:
+        return {"error": "No players available in database"}
+
+    # Pick secret word (player name) from DB
+    secret_word = random.choice(all_players).name
+
+    # Pick impostor from registered users (emails)
     impostor = random.choice(list(players.keys()))
 
+    # Assign roles
     roles = {}
     for player in players:
         if player == impostor:
@@ -57,7 +67,7 @@ def start_game():
         else:
             roles[player] = f"La palabra secreta es: {secret_word}"
 
-    # Enviar correos
+    # Send emails
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
         server.starttls()
         server.login(SENDER_EMAIL, SENDER_PASSWORD)
@@ -72,13 +82,6 @@ def start_game():
             html_body = load_template(player, role_text)
 
             message.attach(MIMEText(html_body, "html"))
+            server.sendmail(SENDER_EMAIL, email, message.as_string())
 
-            server.sendmail(
-                SENDER_EMAIL,
-                email,
-                message.as_string(),
-            )
-
-    return {
-        "message": "Roles enviados a cada jugador",
-    }
+    return {"message": "Roles enviados a cada jugador"}
