@@ -4,142 +4,79 @@
   <meta charset="UTF-8">
   <title>Juego del Impostor ⚽</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(135deg, #2b5876, #4e4376);
-      color: #fff;
-      text-align: center;
-      padding: 40px;
-    }
-
-    h1 {
-      font-size: 2.5rem;
-      margin-bottom: 20px;
-    }
-
-    .card {
-      background: rgba(255, 255, 255, 0.1);
-      padding: 20px;
-      border-radius: 15px;
-      max-width: 400px;
-      margin: auto;
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-    }
-
-    label {
-      font-size: 1.2rem;
-    }
-
-    input {
-      padding: 10px;
-      width: 80%;
-      margin: 10px 0;
-      border-radius: 8px;
-      border: none;
-      outline: none;
-      font-size: 1rem;
-    }
-
-    button {
-      padding: 12px 20px;
-      margin: 10px 5px;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-
-    button:hover {
-      transform: scale(1.05);
-    }
-
-    .btn-connect {
-      background: #00c853;
-      color: #fff;
-    }
-
-    .btn-start {
-      background: #ff3d00;
-      color: #fff;
-    }
-
-    #status {
-      margin-top: 15px;
-      font-weight: bold;
-    }
-
-    #role {
-      margin-top: 25px;
-      font-size: 1.5rem;
-      padding: 15px;
-      background: rgba(0,0,0,0.4);
-      border-radius: 12px;
-    }
+    body { font-family: Arial, sans-serif; background: #2b5876; color: white; text-align: center; padding: 40px; }
+    .card { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+    input, button { margin: 10px; padding: 10px; border-radius: 8px; border: none; }
+    .btn { cursor: pointer; font-weight: bold; }
+    .btn-create { background: #00c853; color: white; }
+    .btn-join { background: #2196f3; color: white; }
+    .btn-start { background: #ff3d00; color: white; }
   </style>
 </head>
 <body>
-  <h1>Juego del Impostor</h1>
+  <h1>⚽ Juego del Impostor</h1>
 
-  <div class="card">
-    <label for="name">Introduce tu nombre:</label><br>
-    <input type="text" id="name" placeholder="Ejemplo: Markus" /><br>
-    <button class="btn-connect" onclick="connect()">Conectarse</button>
-
-    <h2 id="status">❌ No conectado</h2>
-    <h3 id="role"></h3>
-
-    <hr>
-    <button class="btn-start" onclick="startGame()">Iniciar Partida</button>
+  <div class="card" id="menu">
+    <button class="btn btn-create" onclick="createGame()">Crear Partida</button>
+    <button class="btn btn-join" onclick="showJoin()">Unirse a Partida</button>
   </div>
 
+  <div class="card" id="join-section" style="display:none;">
+    <label>Código de sala:</label><br>
+    <input type="text" id="game" placeholder="Ejemplo: X7K9Q"><br>
+    <label>Tu nombre:</label><br>
+    <input type="text" id="name" placeholder="Ejemplo: Markus"><br>
+    <button class="btn btn-join" onclick="connect()">Conectarse</button>
+  </div>
+
+  <h2 id="status"></h2>
+  <h3 id="role"></h3>
+  <button class="btn btn-start" onclick="startGame()" style="display:none;" id="startBtn">🚀 Iniciar Partida</button>
+
   <script>
-    let socket;
+    let socket, gameId, playerName;
+
+    async function createGame() {
+      const res = await fetch("http://localhost:8000/create_game", { method: "POST" });
+      const data = await res.json();
+      gameId = data.game_id;
+      document.getElementById("menu").innerHTML = `<h2>🎮 Sala creada: ${gameId}</h2>
+        <p>Comparte este código con tus amigos.</p>
+        <label>Tu nombre:</label><br>
+        <input type="text" id="name" placeholder="Ejemplo: Markus"><br>
+        <button class="btn btn-join" onclick="connect()">Conectarse</button>`;
+      document.getElementById("startBtn").style.display = "inline-block";
+    }
+
+    function showJoin() {
+      document.getElementById("menu").style.display = "none";
+      document.getElementById("join-section").style.display = "block";
+    }
 
     function connect() {
-      const playerName = document.getElementById("name").value.trim();
-      if (!playerName) {
-        alert("Por favor, escribe tu nombre.");
+      playerName = document.getElementById("name").value.trim();
+      if (!gameId) gameId = document.getElementById("game").value.trim();
+
+      if (!gameId || !playerName) {
+        alert("Introduce el código de sala y tu nombre.");
         return;
       }
 
-      socket = new WebSocket(`ws://localhost:8000/ws/${playerName}`);
+      socket = new WebSocket(`ws://localhost:8000/ws/${gameId}/${playerName}`);
 
       socket.onopen = () => {
-        document.getElementById("status").innerText = "Conectado como " + playerName;
+        document.getElementById("status").innerText = `✅ Conectado a la sala ${gameId} como ${playerName}`;
       };
-
       socket.onmessage = (event) => {
-        document.getElementById("role").innerText = "Tu rol: " + event.data;
+        document.getElementById("role").innerText = "🎭 Tu rol: " + event.data;
       };
-
-      socket.onclose = () => {
-        document.getElementById("status").innerText = "Desconectado";
-      };
-
-      socket.onerror = (err) => {
-        console.error("Error de WebSocket:", err);
-      };
-
-      // Mantener conexión viva
-      setInterval(() => {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-          socket.send("ping");
-        }
-      }, 30000);
+      socket.onclose = () => document.getElementById("status").innerText = "❌ Desconectado";
     }
 
     async function startGame() {
-      try {
-        const res = await fetch("http://localhost:8000/start_game", {
-          method: "POST"
-        });
-        const data = await res.json();
-        alert( data.message);
-      } catch (err) {
-        alert("Error al iniciar la partida: " + err);
-      }
+      const res = await fetch(`http://localhost:8000/start_game/${gameId}`, { method: "POST" });
+      const data = await res.json();
+      alert(data.message);
     }
   </script>
 </body>

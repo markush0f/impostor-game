@@ -1,86 +1,74 @@
-import random
-import os
-from dotenv import load_dotenv
-from fastapi import FastAPI, Form, WebSocket, WebSocketDisconnect
-from pathlib import Path as FilePath
-from app.models import Player
-from app.database import SessionLocal
+import random, string
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from app.database import SessionLocal
+from app.models import Player
 
 app = FastAPI()
-load_dotenv()
-
-# Registered players (from /register)
-players = {}
-
-# Connected players (via WebSocket)
-connected_players = {}
-
-
-# def load_template(player: str, role: str) -> str:
-#     template_path = FilePath("email_template.html")
-#     html = template_path.read_text(encoding="utf-8")
-#     html = html.replace("{{player}}", player)
-#     html = html.replace("{{role}}", role)
-#     return html
-
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
-@app.post("/register")
-def register(name: str = Form(...), email: str = Form(...)):
-    players[name] = email
-    return {"message": f"{name} registered!"}
+# Diccionario: { game_id: { player_name: websocket } }
+games = {}
 
 
-@app.get("/user-list")
-def user_list():
-    return {"players": list(players.keys())}
+def generate_game_code(length=5):
+    """Genera un código único de sala, ej: 'X7K9Q'"""
+    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 
-# WebSocket connection for each player
-@app.websocket("/ws/{player_name}")
-async def websocket_endpoint(websocket: WebSocket, player_name: str):
+@app.post("/create_game")
+def create_game():
+    code = generate_game_code()
+    while code in games:  # asegurar que no se repite
+        code = generate_game_code()
+    games[code] = {}
+    return {"game_id": code}
+
+
+@app.websocket("/ws/{game_id}/{player_name}")
+async def websocket_endpoint(websocket: WebSocket, game_id: str, player_name: str):
     await websocket.accept()
-    connected_players[player_name] = websocket
+    if game_id not in games:
+        games[game_id] = {}
+    games[game_id][player_name] = websocket
     try:
         while True:
-            await websocket.receive_text()  # Keep connection alive
+            await websocket.receive_text()
     except WebSocketDisconnect:
-        del connected_players[player_name]
+        del games[game_id][player_name]
+        if not games[game_id]:
+            del games[game_id]
 
 
-@app.post("/start_game")
-async def start_game():
+@app.post("/start_game/{game_id}")
+async def start_game(game_id: str):
+    if game_id not in games or not games[game_id]:
+        return {"error": "No hay jugadores conectados en esta partida"}
+
     db = SessionLocal()
     all_players = db.query(Player).all()
     db.close()
 
     if not all_players:
-        return {"error": "No players available in database"}
+        return {"error": "No hay jugadores en la base de datos"}
 
-    # Pick secret word (from famous players DB)
     secret_word = random.choice(all_players).name
+    impostor = random.choice(list(games[game_id].keys()))
 
-    if not connected_players:
-        return {"error": "No players connected"}
-
-    # Pick impostor among connected players
-    impostor = random.choice(list(connected_players.keys()))
-
-    # Assign roles and send via WebSocket
-    for player_name, websocket in connected_players.items():
+    for player_name, websocket in games[game_id].items():
         if player_name == impostor:
             role = "Eres el impostor!"
         else:
             role = f"La palabra secreta es: {secret_word}"
         await websocket.send_text(role)
 
-    return {"message": "Game started, roles sent to connected players"}
+    return {
+        "message": f"Partida {game_id} iniciada con {len(games[game_id])} jugadores"
+    }
