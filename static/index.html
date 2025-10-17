@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Impostor Game ⚽</title>
+</head>
+<body>
+  <h1>Impostor Game ⚽</h1>
+
+  <label for="name">Your name:</label>
+  <input type="text" id="name" placeholder="Enter your name" />
+  <button onclick="connect()">Connect</button>
+
+  <h2 id="status">Not connected</h2>
+  <h3 id="role"></h3>
+
+  <hr>
+  <button onclick="startGame()">🚀 Start Game</button>
+
+  <script>
+    let socket;
+
+    function connect() {
+      const playerName = document.getElementById("name").value.trim();
+      if (!playerName) {
+        alert("Please enter your name!");
+        return;
+      }
+
+      socket = new WebSocket(`ws://localhost:8000/ws/${playerName}`);
+
+      socket.onopen = () => {
+        document.getElementById("status").innerText = "✅ Connected as " + playerName;
+      };
+
+      socket.onmessage = (event) => {
+        document.getElementById("role").innerText = "🎭 Your role: " + event.data;
+      };
+
+      socket.onclose = () => {
+        document.getElementById("status").innerText = "❌ Disconnected";
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+
+      // Optional keep-alive
+      setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send("ping");
+        }
+      }, 30000);
+    }
+
+    async function startGame() {
+      try {
+        const res = await fetch("http://localhost:8000/start_game", {
+          method: "POST"
+        });
+        const data = await res.json();
+        alert(data.message);
+      } catch (err) {
+        alert("Error starting game: " + err);
+      }
+    }
+  </script>
+</body>
+</html>

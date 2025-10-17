@@ -1,51 +1,54 @@
-from email import message
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-import os
 import random
-import smtplib
+import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Form, Path
+from fastapi import FastAPI, Form, WebSocket, WebSocketDisconnect
 from pathlib import Path as FilePath
-from models import Player
-from database import SessionLocal
-
+from app.models import Player
+from app.database import SessionLocal
 
 app = FastAPI()
-
 load_dotenv()
 
-SMTP_SERVER = os.getenv("SMTP_SERVER")
-SMTP_PORT = int(os.getenv("SMTP_PORT"))
-SENDER_EMAIL = os.getenv("SENDER_EMAIL")
-SENDER_PASSWORD = os.getenv("SENDER_PASSWORD")
-
+# Registered players (from /register)
 players = {}
 
+# Connected players (via WebSocket)
+connected_players = {}
 
-def load_template(player: str, role: str) -> str:
-    template_path = FilePath("email_template.html")
-    html = template_path.read_text(encoding="utf-8")
-    html = html.replace("{{player}}", player)
-    html = html.replace("{{role}}", role)
-    return html
+
+# def load_template(player: str, role: str) -> str:
+#     template_path = FilePath("email_template.html")
+#     html = template_path.read_text(encoding="utf-8")
+#     html = html.replace("{{player}}", player)
+#     html = html.replace("{{role}}", role)
+#     return html
 
 
 @app.post("/register")
 def register(name: str = Form(...), email: str = Form(...)):
     players[name] = email
-    return {"message": f"{name} registrado!"}
+    return {"message": f"{name} registered!"}
 
 
 @app.get("/user-list")
 def user_list():
-    return {
-        "players": players,
-    }
+    return {"players": list(players.keys())}
+
+
+# WebSocket connection for each player
+@app.websocket("/ws/{player_name}")
+async def websocket_endpoint(websocket: WebSocket, player_name: str):
+    await websocket.accept()
+    connected_players[player_name] = websocket
+    try:
+        while True:
+            await websocket.receive_text()  # Keep connection alive
+    except WebSocketDisconnect:
+        del connected_players[player_name]
 
 
 @app.post("/start_game")
-def start_game():
+async def start_game():
     db = SessionLocal()
     all_players = db.query(Player).all()
     db.close()
@@ -53,35 +56,21 @@ def start_game():
     if not all_players:
         return {"error": "No players available in database"}
 
-    # Pick secret word (player name) from DB
+    # Pick secret word (from famous players DB)
     secret_word = random.choice(all_players).name
 
-    # Pick impostor from registered users (emails)
-    impostor = random.choice(list(players.keys()))
+    if not connected_players:
+        return {"error": "No players connected"}
 
-    # Assign roles
-    roles = {}
-    for player in players:
-        if player == impostor:
-            roles[player] = "Eres el impostor!"
+    # Pick impostor among connected players
+    impostor = random.choice(list(connected_players.keys()))
+
+    # Assign roles and send via WebSocket
+    for player_name, websocket in connected_players.items():
+        if player_name == impostor:
+            role = "Eres el impostor!"
         else:
-            roles[player] = f"La palabra secreta es: {secret_word}"
+            role = f"La palabra secreta es: {secret_word}"
+        await websocket.send_text(role)
 
-    # Send emails
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-        server.starttls()
-        server.login(SENDER_EMAIL, SENDER_PASSWORD)
-
-        for player, email in players.items():
-            message = MIMEMultipart("alternative")
-            message["From"] = SENDER_EMAIL
-            message["To"] = email
-            message["Subject"] = "Tu rol en el Impostor de Fútbol ⚽"
-
-            role_text = roles[player]
-            html_body = load_template(player, role_text)
-
-            message.attach(MIMEText(html_body, "html"))
-            server.sendmail(SENDER_EMAIL, email, message.as_string())
-
-    return {"message": "Roles enviados a cada jugador"}
+    return {"message": "Game started, roles sent to connected players"}

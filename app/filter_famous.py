@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from sqlalchemy.dialects.sqlite import insert
 from database import SessionLocal, engine
-from models import Player, Base
+from app.models import Player, Base
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
