@@ -1,21 +1,98 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Impostor Game ⚽</title>
+  <title>Juego del Impostor ⚽</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #2b5876, #4e4376);
+      color: #fff;
+      text-align: center;
+      padding: 40px;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 15px;
+      max-width: 400px;
+      margin: auto;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    label {
+      font-size: 1.2rem;
+    }
+
+    input {
+      padding: 10px;
+      width: 80%;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      font-size: 1rem;
+    }
+
+    button {
+      padding: 12px 20px;
+      margin: 10px 5px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+    }
+
+    .btn-connect {
+      background: #00c853;
+      color: #fff;
+    }
+
+    .btn-start {
+      background: #ff3d00;
+      color: #fff;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    #role {
+      margin-top: 25px;
+      font-size: 1.5rem;
+      padding: 15px;
+      background: rgba(0,0,0,0.4);
+      border-radius: 12px;
+    }
+  </style>
 </head>
 <body>
-  <h1>Impostor Game ⚽</h1>
+  <h1>Juego del Impostor</h1>
 
-  <label for="name">Your name:</label>
-  <input type="text" id="name" placeholder="Enter your name" />
-  <button onclick="connect()">Connect</button>
+  <div class="card">
+    <label for="name">Introduce tu nombre:</label><br>
+    <input type="text" id="name" placeholder="Ejemplo: Markus" /><br>
+    <button class="btn-connect" onclick="connect()">Conectarse</button>
 
-  <h2 id="status">Not connected</h2>
-  <h3 id="role"></h3>
+    <h2 id="status">❌ No conectado</h2>
+    <h3 id="role"></h3>
 
-  <hr>
-  <button onclick="startGame()">🚀 Start Game</button>
+    <hr>
+    <button class="btn-start" onclick="startGame()">Iniciar Partida</button>
+  </div>
 
   <script>
     let socket;
@@ -23,29 +100,29 @@
     function connect() {
       const playerName = document.getElementById("name").value.trim();
       if (!playerName) {
-        alert("Please enter your name!");
+        alert("Por favor, escribe tu nombre.");
         return;
       }
 
       socket = new WebSocket(`ws://localhost:8000/ws/${playerName}`);
 
       socket.onopen = () => {
-        document.getElementById("status").innerText = "✅ Connected as " + playerName;
+        document.getElementById("status").innerText = "Conectado como " + playerName;
       };
 
       socket.onmessage = (event) => {
-        document.getElementById("role").innerText = "🎭 Your role: " + event.data;
+        document.getElementById("role").innerText = "Tu rol: " + event.data;
       };
 
       socket.onclose = () => {
-        document.getElementById("status").innerText = "❌ Disconnected";
+        document.getElementById("status").innerText = "Desconectado";
       };
 
       socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
+        console.error("Error de WebSocket:", err);
       };
 
-      // Optional keep-alive
+      // Mantener conexión viva
       setInterval(() => {
         if (socket && socket.readyState === WebSocket.OPEN) {
           socket.send("ping");
@@ -59,9 +136,9 @@
           method: "POST"
         });
         const data = await res.json();
-        alert(data.message);
+        alert( data.message);
       } catch (err) {
-        alert("Error starting game: " + err);
+        alert("Error al iniciar la partida: " + err);
       }
     }
   </script>

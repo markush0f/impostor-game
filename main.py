@@ -5,6 +5,7 @@ from fastapi import FastAPI, Form, WebSocket, WebSocketDisconnect
 from pathlib import Path as FilePath
 from app.models import Player
 from app.database import SessionLocal
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 load_dotenv()
@@ -22,6 +23,15 @@ connected_players = {}
 #     html = html.replace("{{player}}", player)
 #     html = html.replace("{{role}}", role)
 #     return html
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.post("/register")
