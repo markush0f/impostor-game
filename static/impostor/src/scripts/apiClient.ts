@@ -1,10 +1,12 @@
-export async function createGame() {
+
+export async function createGame(): Promise<{ game_id: string }> {
     const res = await fetch("http://localhost:8000/create_game", { method: "POST" });
-    const data = await res.json();
-    alert(`Sala creada: ${data.game_id}`);
-    // Redirigir a la sala
-    window.location.href = `/game/${data.game_id}`;
+    if (!res.ok) {
+        throw new Error("Failed to create game");
+    }
+    return res.json(); // devuelve { game_id: string }
 }
+
 
 export function joinGame(event: Event) {
     event.preventDefault();

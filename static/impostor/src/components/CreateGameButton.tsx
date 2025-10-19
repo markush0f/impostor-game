@@ -6,12 +6,11 @@ const CreateGameButton: React.FC = () => {
   const handleClick = async () => {
     console.log("Button clicked to create game");
     try {
-      const game = await createGame();
-      console.log("Game created successfully:", game);
+      const data = await createGame();
+      console.log("Game created successfully:", data);
 
-      // Aquí asumimos que la API devuelve { id: "ABC123" }
       const playerName = prompt("Enter your name") || "Jugador";
-      window.location.href = `/game/${game.id}?player=${encodeURIComponent(playerName)}`;
+      window.location.href = `/game/${data.game_id}?player=${encodeURIComponent(playerName)}`;
     } catch (error) {
       console.error("Error creating game:", error);
     }
