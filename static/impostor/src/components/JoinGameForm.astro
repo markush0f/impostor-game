@@ -1,0 +1,24 @@
+---
+import { joinGame } from "../scripts/apiClient";
+---
+
+<form class="flex flex-col gap-3" onsubmit="joinGame(event)">
+  <input
+    id="gameId"
+    type="text"
+    placeholder="Código de sala"
+    class="p-2 rounded text-black"
+  />
+  <input
+    id="playerName"
+    type="text"
+    placeholder="Tu nombre"
+    class="p-2 rounded text-black"
+  />
+  <button
+    type="submit"
+    class="w-full py-3 bg-blue-600 rounded-lg text-lg font-semibold hover:bg-blue-700 transition"
+  >
+    🔑 Unirse a Partida
+  </button>
+</form>

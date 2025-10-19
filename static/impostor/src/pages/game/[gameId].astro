@@ -1,0 +1,18 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import RoleDisplay from "../../components/RoleDisplay.astro";
+
+const { gameId } = Astro.params;
+const playerName = Astro.url.searchParams.get("player") || "";
+---
+
+<BaseLayout title={`Sala ${gameId}`}>
+  <main
+    class="flex flex-col items-center justify-center min-h-screen text-center"
+  >
+    <h1 class="text-3xl font-bold mb-4">Sala: {gameId}</h1>
+    <h2 class="mb-6">Jugador: {playerName}</h2>
+
+    <RoleDisplay gameId={gameId} playerName={playerName} />
+  </main>
+</BaseLayout>

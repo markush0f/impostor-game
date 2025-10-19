@@ -1,0 +1,28 @@
+---
+const { gameId, playerName } = Astro.props;
+---
+
+<div id="status" class="mb-4">Conectando...</div>
+<div id="role" class="text-xl font-semibold"></div>
+
+<script>
+  const gameId = "{{gameId}}";
+  const playerName = "{{playerName}}";
+
+  const socket = new WebSocket(
+    `ws://localhost:8000/ws/${gameId}/${playerName}`
+  );
+
+  socket.onopen = () => {
+    document.getElementById("status")!.innerText =
+      `✅ Conectado a la sala ${gameId} como ${playerName}`;
+  };
+
+  socket.onmessage = (event) => {
+    document.getElementById("role")!.innerText = "🎭 Tu rol: " + event.data;
+  };
+
+  socket.onclose = () => {
+    document.getElementById("status")!.innerText = "❌ Desconectado";
+  };
+</script>
