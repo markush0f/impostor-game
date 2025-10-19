@@ -1,4 +1,4 @@
-import random, string
+import random, string, json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import SessionLocal
@@ -8,7 +8,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # en producción limita al dominio del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -32,18 +32,38 @@ def create_game():
     return {"game_id": code}
 
 
+async def broadcast(game_id: str, message: dict):
+    """Enviar un mensaje JSON a todos los jugadores de la sala"""
+    data = json.dumps(message)
+    for ws in games[game_id].values():
+        await ws.send_text(data)
+
+
+async def update_player_list(game_id: str):
+    """Notificar lista de jugadores conectados"""
+    players = list(games[game_id].keys())
+    await broadcast(game_id, {"type": "players", "players": players})
+
+
 @app.websocket("/ws/{game_id}/{player_name}")
-async def websocket_endpoint(websocket: WebSocket, game_id: str, player_name: str):
+async def join_game(websocket: WebSocket, game_id: str, player_name: str):
     await websocket.accept()
     if game_id not in games:
         games[game_id] = {}
     games[game_id][player_name] = websocket
+
+    await update_player_list(game_id)
+
     try:
         while True:
-            await websocket.receive_text()
+            msg = await websocket.receive_text()
+            # Soon to be extended for more message types
+            await broadcast(game_id, {"type": "chat", "from": player_name, "msg": msg})
     except WebSocketDisconnect:
         del games[game_id][player_name]
-        if not games[game_id]:
+        if games[game_id]:
+            await update_player_list(game_id)
+        else:
             del games[game_id]
 
 
@@ -62,12 +82,16 @@ async def start_game(game_id: str):
     secret_word = random.choice(all_players).name
     impostor = random.choice(list(games[game_id].keys()))
 
+    # Enviar roles individuales
     for player_name, websocket in games[game_id].items():
         if player_name == impostor:
             role = "Eres el impostor!"
         else:
             role = f"La palabra secreta es: {secret_word}"
-        await websocket.send_text(role)
+        await websocket.send_text(json.dumps({"type": "role", "role": role}))
+
+    # Avisar que arrancó la partida
+    await broadcast(game_id, {"type": "system", "msg": "La partida ha comenzado"})
 
     return {
         "message": f"Partida {game_id} iniciada con {len(games[game_id])} jugadores"
