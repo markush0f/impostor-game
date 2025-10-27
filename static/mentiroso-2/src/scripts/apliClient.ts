@@ -1,6 +1,6 @@
 
-export async function createGame(): Promise<{ game_id: string }> {
-    const res = await fetch("http://localhost:8000/create_game", { method: "POST" });
+export async function createGame(name: string): Promise<{ game_id: string }> {
+    const res = await fetch(`http://localhost:8000/create_game/${name}`, { method: "POST" });
     if (!res.ok) {
         throw new Error("Failed to create game");
     }

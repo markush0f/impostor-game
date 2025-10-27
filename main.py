@@ -14,7 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Diccionario: { game_id: { player_name: websocket } }
+# Estructura: { game_id: { "host": "Markus", "players": { "Markus": websocket, ... } } }
 games = {}
 
 
@@ -23,13 +23,13 @@ def generate_game_code(length=5):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 
-@app.post("/create_game")
-def create_game():
+@app.post("/create_game/{player_name}")
+def create_game(player_name: str):
     code = generate_game_code()
-    while code in games:  # asegurar que no se repite
+    while code in games:
         code = generate_game_code()
-    games[code] = {}
-    return {"game_id": code}
+    games[code] = {"host": player_name, "players": {}}
+    return {"game_id": code, "host": player_name}
 
 
 async def broadcast(game_id: str, message: dict):
